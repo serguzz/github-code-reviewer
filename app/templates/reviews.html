@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reviews - GitHub PR Review Bot</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        /* Additional specific styles for reviews page */
+        .refresh-btn {
+            float: right;
+            background: #28a745;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        
+        .refresh-btn:hover {
+            background: #218838;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🤖 GitHub PR Review Bot</h1>
+        <nav class="nav">
+            <a href="/">Submit Review</a>
+            <a href="/reviews" class="active">View Reviews</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>📝 Recent Reviews</h2>
+            <button class="refresh-btn" onclick="loadReviews()">
+                <span id="refresh-icon">🔄</span> Refresh
+            </button>
+        </div>
+        
+        <div id="loading" class="status loading" style="display: none;">
+            <div class="loading-spinner"></div> Loading reviews...
+        </div>
+        
+        <div id="reviews-container" class="reviews-container">
+            <!-- Reviews will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        async function loadReviews() {
+            const loadingDiv = document.getElementById('loading');
+            const reviewsContainer = document.getElementById('reviews-container');
+            const refreshIcon = document.getElementById('refresh-icon');
+            
+            // Show loading state
+            loadingDiv.style.display = 'block';
+            refreshIcon.innerHTML = '<div class="loading-spinner"></div>';
+            reviewsContainer.innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/reviews');
+                const data = await response.json();
+                
+                // Hide loading state
+                loadingDiv.style.display = 'none';
+                refreshIcon.innerHTML = '🔄';
+                
+                if (data.reviews && data.reviews.length > 0) {
+                    displayReviews(data.reviews);
+                } else {
+                    displayNoReviews();
+                }
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                refreshIcon.innerHTML = '🔄';
+                reviewsContainer.innerHTML = `
+                    <div class="status error">
+                        ❌ Error loading reviews: ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function displayReviews(reviews) {
+            const reviewsContainer = document.getElementById('reviews-container');
+            
+            const reviewsHtml = reviews.map(review => {
+                const statusClass = getStatusClass(review.status);
+                const statusIcon = getStatusIcon(review.status);
+                const formattedDate = formatDate(review.created_at);
+                const repoDisplayName = review.repo_name || extractRepoFromUrl(review.pr_url);
+                
+                return `
+                    <div class="review-card">
+                        <div class="review-header">
+                            <h3 class="review-title">
+                                ${repoDisplayName} - PR #${review.pr_number}
+                            </h3>
+                            <span class="review-status ${statusClass}">
+                                ${statusIcon} ${review.status}
+                            </span>
+                        </div>
+                        
+                        <div class="review-meta">
+                            <span>🗓️ ${formattedDate}</span>
+                            <span class="comments-count">
+                                💬 ${review.comments_added} comments
+                            </span>
+                        </div>
+                        
+                        <div>
+                            <a href="${review.pr_url}" target="_blank" class="review-url">
+                                📎 View Pull Request →
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            reviewsContainer.innerHTML = reviewsHtml;
+        }
+        
+        function displayNoReviews() {
+            const reviewsContainer = document.getElementById('reviews-container');
+            reviewsContainer.innerHTML = `
+                <div class="no-reviews">
+                    <h3>🔍 No reviews found</h3>
+                    <p>No pull request reviews have been completed yet.</p>
+                    <p><a href="/">Submit your first review</a> to get started!</p>
+                </div>
+            `;
+        }
+        
+        function getStatusClass(status) {
+            switch (status.toLowerCase()) {
+                case 'completed':
+                case 'success':
+                    return 'status-completed';
+                case 'failed':
+                case 'error':
+                    return 'status-failed';
+                case 'pending':
+                case 'processing':
+                    return 'status-pending';
+                default:
+                    return 'status-pending';
+            }
+        }
+        
+        function getStatusIcon(status) {
+            switch (status.toLowerCase()) {
+                case 'completed':
+                case 'success':
+                    return '✅';
+                case 'failed':
+                case 'error':
+                    return '❌';
+                case 'pending':
+                case 'processing':
+                    return '⏳';
+                default:
+                    return '📋';
+            }
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            
+            if (diffMinutes < 1) {
+                return 'Just now';
+            } else if (diffMinutes < 60) {
+                return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffDays < 7) {
+                return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            } else {
+                return date.toLocaleDateString();
+            }
+        }
+        
+        function extractRepoFromUrl(url) {
+            try {
+                const match = url.match(/github\.com\/([^\/]+\/[^\/]+)/);
+                return match ? match[1] : 'Unknown Repository';
+            } catch {
+                return 'Unknown Repository';
+            }
+        }
+        
+        // Load reviews when the page loads
+        document.addEventListener('DOMContentLoaded', loadReviews);
+    </script>
+</body>
+</html>
