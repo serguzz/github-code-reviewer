@@ -7,6 +7,8 @@ __pycache__
 *.pyw
 *.pyz
 
-# Database and logs
+# Database
 pr_reviews.db
+
+# Logs
 pr_review_bot.log
