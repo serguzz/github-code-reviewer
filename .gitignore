@@ -6,3 +6,9 @@ __pycache__
 *.pyd
 *.pyw
 *.pyz
+
+# Database
+pr_reviews.db
+
+# Logs
+pr_review_bot.log
