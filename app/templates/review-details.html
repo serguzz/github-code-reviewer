@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Details - GitHub PR Review Bot</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <header>
+        <h1>🤖 GitHub PR Review Bot</h1>
+        <nav class="nav">
+            <a href="/">Submit Review</a>
+            <a href="/reviews">View Reviews</a>
+            <a href="#" class="active">Review Details</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <a href="/reviews" class="back-link">← Back to Reviews</a>
+        
+        <div id="loading-details" class="loading-details" style="display: block;">
+            <div class="loading-spinner"></div>
+            <p>Loading review details...</p>
+        </div>
+        
+        <div id="review-content" style="display: none;">
+            <!-- Review details will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        // Get review ID from URL
+        const reviewId = window.location.pathname.split('/review/')[1];
+        
+        async function loadReviewDetails() {
+            try {
+                // Load review details and comments in parallel
+                const [reviewResponse, commentsResponse] = await Promise.all([
+                    fetch(`/api/review/${reviewId}`),
+                    fetch(`/api/comments/${reviewId}`)
+                ]);
+                
+                const reviewData = await reviewResponse.json();
+                const commentsData = await commentsResponse.json();
+                
+                if (!reviewResponse.ok) {
+                    throw new Error(reviewData.detail || 'Failed to load review details');
+                }
+                
+                displayReviewDetails(reviewData, commentsData.comments);
+                
+            } catch (error) {
+                document.getElementById('loading-details').style.display = 'none';
+                document.getElementById('review-content').innerHTML = `
+                    <div class="status error">
+                        ❌ Error loading review details: ${error.message}
+                    </div>
+                `;
+                document.getElementById('review-content').style.display = 'block';
+            }
+        }
+        
+        function displayReviewDetails(review, comments) {
+            const loadingDiv = document.getElementById('loading-details');
+            const contentDiv = document.getElementById('review-content');
+            
+            loadingDiv.style.display = 'none';
+            
+            const statusClass = getStatusClass(review.status);
+            const statusIcon = getStatusIcon(review.status);
+            const formattedDate = formatDate(review.created_at);
+            const repoDisplayName = review.repo_name || extractRepoFromUrl(review.pr_url);
+            
+            let content = `
+                <h2>📝 Review Details</h2>
+                
+                <div class="review-details">
+                    <div class="review-header">
+                        <h3 class="review-title">
+                            ${repoDisplayName} - PR #${review.pr_number}
+                        </h3>
+                        <span class="review-status ${statusClass}">
+                            ${statusIcon} ${review.status}
+                        </span>
+                    </div>
+                    
+                    <div class="review-info">
+                        <div class="info-item">
+                            <span class="info-label">Review Date</span>
+                            <span class="info-value">🗓️ ${formattedDate}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Comments Added</span>
+                            <span class="info-value">💬 ${review.comments_added} comments</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Repository</span>
+                            <span class="info-value">📁 ${repoDisplayName}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Pull Request</span>
+                            <span class="info-value">
+                                <a href="${review.pr_url}" target="_blank" class="review-url">
+                                    🔗 PR #${review.pr_number}
+                                </a>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    ${review.error_message ? `
+                        <div class="error-message">
+                            <strong>Error:</strong> ${review.error_message}
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="comments-section">
+                    <h3>💬 Review Comments (${comments.length})</h3>
+            `;
+            
+            if (comments.length > 0) {
+                content += comments.map(comment => `
+                    <div class="comment-card">
+                        <div class="comment-header">
+                            <span class="file-info">📄 ${comment.file_path}</span>
+                            ${comment.line_number ? `<span class="line-info">Line ${comment.line_number}</span>` : ''}
+                        </div>
+                        <div class="comment-content">${escapeHtml(comment.comment)}</div>
+                    </div>
+                `).join('');
+            } else {
+                content += `
+                    <div class="no-comments">
+                        <h4>💭 No comments available</h4>
+                        <p>This review completed without generating any comments.</p>
+                    </div>
+                `;
+            }
+            
+            content += `</div>`;
+            
+            contentDiv.innerHTML = content;
+            contentDiv.style.display = 'block';
+        }
+        
+        function getStatusClass(status) {
+            switch (status.toLowerCase()) {
+                case 'completed':
+                case 'success':
+                    return 'status-completed';
+                case 'failed':
+                case 'error':
+                    return 'status-failed';
+                case 'pending':
+                case 'processing':
+                    return 'status-pending';
+                default:
+                    return 'status-pending';
+            }
+        }
+        
+        function getStatusIcon(status) {
+            switch (status.toLowerCase()) {
+                case 'completed':
+                case 'success':
+                    return '✅';
+                case 'failed':
+                case 'error':
+                    return '❌';
+                case 'pending':
+                case 'processing':
+                    return '⏳';
+                default:
+                    return '📋';
+            }
+        }
+        
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            
+            if (diffMinutes < 1) {
+                return 'Just now';
+            } else if (diffMinutes < 60) {
+                return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffDays < 7) {
+                return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            } else {
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            }
+        }
+        
+        function extractRepoFromUrl(url) {
+            try {
+                const match = url.match(/github\.com\/([^\/]+\/[^\/]+)/);
+                return match ? match[1] : 'Unknown Repository';
+            } catch {
+                return 'Unknown Repository';
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Load review details when the page loads
+        document.addEventListener('DOMContentLoaded', loadReviewDetails);
+    </script>
+</body>
+</html>

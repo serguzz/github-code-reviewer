@@ -32,6 +32,11 @@ async def reviews_page(request: Request):
     """Reviews page to view all reviews"""
     return templates.TemplateResponse("reviews.html", {"request": request})
 
+@router.get("/review/{review_id}", response_class=HTMLResponse)
+async def review_page(request: Request, review_id: int):
+    """Comments page to view comments for a review"""
+    return templates.TemplateResponse("review-details.html", {"request": request})
+
 @router.post("/review", response_model=PRReviewResponse)
 async def review_pr(request: PRReviewRequest):
     """Review a GitHub PR"""
@@ -61,7 +66,43 @@ async def get_reviews():
     reviews = db_ops.get_recent_reviews()
     return {"reviews": reviews}
 
+
+@router.get("/api/review/{review_id}")
+async def get_review_details(review_id: int):
+    """Get review details by ID"""
+    review = db_ops.get_review_details(review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+    return review
+
+@router.get("/api/comments/{review_id}")
+async def get_comments(review_id: int):
+    """Get comments for a review"""
+    comments = db_ops.get_comments_for_review(review_id)
+    return {"comments": [
+        {
+            "file_path": comment.file_path,
+            "line_number": comment.line_number,
+            "comment": comment.comment
+        }
+        for comment in comments
+    ]}
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()} 
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@router.post("/admin/fix-database")
+async def fix_database():
+    """Fix/repair database issues"""
+    try:
+        success = db_ops.fix_database()
+        if success:
+            return {"status": "success", "message": "Database fixed successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to fix database")
+    except Exception as e:
+        logger.error(f"Error fixing database: {e}")
+        raise HTTPException(status_code=500, detail=f"Database fix failed: {str(e)}") 
