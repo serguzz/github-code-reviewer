@@ -55,15 +55,25 @@ class GitHubService:
                 "body": comment.comment
             })
         
-        # Create review with comments
+        # Create review with summary
         try:
             pr.create_review(
                 commit=latest_commit,
-                body="🤖 **Automated Code Review**\n\nI've analyzed the changes in this PR and found some areas for improvement. Please review the inline comments below.",
-                event="COMMENT",
-                comments=review_comments
+                body="🤖 **Automated Code Review**\n\nI've analyzed the changes in this PR and found some areas for improvement. Please review the comments below.",
+                event="COMMENT"
             )
-            return len(review_comments)
+            
+            # Add individual comments as issue comments
+            added_comments = 0
+            for comment in comments:
+                try:
+                    pr.create_issue_comment(f"**{comment.file_path}:{comment.line_number}**\n{comment.comment}")
+                    added_comments += 1
+                except Exception as e2:
+                    logger.error(f"Error adding comment: {str(e2)}")
+                    continue
+            
+            return added_comments
         except Exception as e:
             logger.error(f"Error creating review: {str(e)}")
             # Fallback: add individual comments
