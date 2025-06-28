@@ -44,15 +44,10 @@ class ReviewService:
                 
                 logger.warning(f"PR access failed: {error_msg}")
                 
-                # Store as client error in database
-                review_id = self.db_ops.store_review_data(
-                    pr_url, repo_name, pr_number, "invalid", None, error_msg
-                )
-                
                 return {
                     "status": "invalid",
                     "message": error_msg,
-                    "review_id": review_id
+                    "review_id": None
                 }
             
             # Get PR details
