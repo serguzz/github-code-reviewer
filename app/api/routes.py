@@ -27,6 +27,11 @@ async def home(request: Request):
     """Home page with simple form"""
     return templates.TemplateResponse("index.html", {"request": request})
 
+@router.get("/reviews", response_class=HTMLResponse)
+async def reviews_page(request: Request):
+    """Reviews page to view all reviews"""
+    return templates.TemplateResponse("reviews.html", {"request": request})
+
 @router.post("/review", response_model=PRReviewResponse)
 async def review_pr(request: PRReviewRequest):
     """Review a GitHub PR"""
@@ -50,7 +55,7 @@ async def review_pr(request: PRReviewRequest):
         review_id=result.get("review_id")
     )
 
-@router.get("/reviews")
+@router.get("/api/reviews")
 async def get_reviews():
     """Get recent reviews"""
     reviews = db_ops.get_recent_reviews()
