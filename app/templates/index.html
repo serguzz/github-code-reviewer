@@ -49,13 +49,20 @@
                 
                 const result = await response.json();
                 
-                if (result.status === 'completed') {
-                    statusDiv.innerHTML = `<div class="status success">✅ ${result.message}</div>`;
+                if (response.ok) {
+                    // Successful response (200-299)
+                    if (result.status === 'completed') {
+                        statusDiv.innerHTML = `<div class="status success">✅ ${result.message}</div>`;
+                    } else {
+                        statusDiv.innerHTML = `<div class="status error">❌ ${result.message}</div>`;
+                    }
                 } else {
-                    statusDiv.innerHTML = `<div class="status error">❌ ${result.message}</div>`;
+                    // Error response (400, 500, etc.)
+                    const errorMessage = result.detail || result.message || 'Unknown error occurred';
+                    statusDiv.innerHTML = `<div class="status error">❌ ${errorMessage}</div>`;
                 }
             } catch (error) {
-                statusDiv.innerHTML = `<div class="status error">❌ Error: ${error.message}</div>`;
+                statusDiv.innerHTML = `<div class="status error">❌ Network error: ${error.message}</div>`;
             }
         });
     </script>

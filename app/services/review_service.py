@@ -29,8 +29,31 @@ class ReviewService:
             repo_name, pr_number = parse_github_url(pr_url)
             logger.info(f"Parsed PR: {repo_name}#{pr_number}")
             
-            # Get PR from GitHub
-            pr, repo_name, pr_number = self.github_service.get_pull_request(pr_url)
+            # Check if PR exists and get PR from GitHub
+            try:
+                pr, repo_name, pr_number = self.github_service.get_pull_request(pr_url)
+                logger.info(f"Found PR: {pr.title}")
+            except Exception as e:
+                error_msg = ""
+                if "404" in str(e) or "Not Found" in str(e):
+                    error_msg = f"Pull Request not found: {repo_name}#{pr_number}. Please check the URL and ensure the PR exists and is accessible."
+                elif "403" in str(e) or "Forbidden" in str(e):
+                    error_msg = f"Access denied to PR {repo_name}#{pr_number}. Please check if the repository is private or requires authentication."
+                else:
+                    error_msg = f"Failed to access PR {repo_name}#{pr_number}: {str(e)}"
+                
+                logger.warning(f"PR access failed: {error_msg}")
+                
+                # Store as client error in database
+                review_id = self.db_ops.store_review_data(
+                    pr_url, repo_name, pr_number, "invalid", None, error_msg
+                )
+                
+                return {
+                    "status": "invalid",
+                    "message": error_msg,
+                    "review_id": review_id
+                }
             
             # Get PR details
             pr_details = self.github_service.get_pr_details(pr)

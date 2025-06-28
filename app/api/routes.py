@@ -53,6 +53,8 @@ async def review_pr(request: PRReviewRequest):
     
     if result["status"] == "failed":
         raise HTTPException(status_code=500, detail=result["message"])
+    elif result["status"] == "invalid":
+        raise HTTPException(status_code=400, detail=result["message"])
     
     return PRReviewResponse(
         status=result["status"],
