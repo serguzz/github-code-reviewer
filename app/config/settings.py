@@ -3,6 +3,7 @@ Configuration settings for the GitHub PR Review Bot
 """
 import os
 import logging
+import dotenv
 
 # AI Model Configuration
 MODEL = "gpt-4o-mini"  # gpt-4o-mini, gpt-4o, gpt-4
@@ -24,6 +25,8 @@ PORT = 8000
 LOG_FILE = "pr_review_bot.log"
 LOG_LEVEL = logging.INFO
 LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+dotenv.load_dotenv()
 
 def validate_environment():
     """Validate required environment variables"""
